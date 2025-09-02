@@ -12,26 +12,24 @@ class TestPolygonService:
     
     @patch('external.polygon_auth.RESTClient')
     def test_init_success(self, mock_rest_client):
-        """Test successful initialization with valid API key"""
+        # This test verifies that the PolygonService initializes correctly when given a valid API key
         with patch.dict(os.environ, {'POLYGON_API_KEY': 'test_key'}):
             service = PolygonService()
             assert service.client is not None
             mock_rest_client.assert_called_once_with(api_key='test_key')
     
     def test_init_missing_api_key(self):
-        """Test initialization fails without API key"""
+        # This test ensures the service fails gracefully when no API key is provided
         with patch.dict(os.environ, {}, clear=True):
             with pytest.raises(ValueError, match="POLYGON_API_KEY not found"):
                 PolygonService()
     
     @patch('external.polygon_auth.RESTClient')
     def test_get_intraday_data_success(self, mock_rest_client):
-        """Test successful intraday data retrieval"""
-        # Mock the REST client and its response
+        # This test mocks a successful API response and verifies the data is processed correctly
         mock_client = Mock()
         mock_rest_client.return_value = mock_client
         
-        # Mock the aggregate data
         mock_agg = Mock()
         mock_agg.open = 150.0
         mock_agg.high = 151.0
@@ -59,7 +57,7 @@ class TestPolygonService:
     
     @patch('external.polygon_auth.RESTClient')
     def test_get_intraday_data_no_results(self, mock_rest_client):
-        """Test when no intraday data is returned"""
+        # This test handles the case where the API returns no data
         mock_client = Mock()
         mock_rest_client.return_value = mock_client
         mock_client.list_aggs.return_value = []
@@ -72,7 +70,7 @@ class TestPolygonService:
     
     @patch('external.polygon_auth.RESTClient')
     def test_get_intraday_data_exception(self, mock_rest_client):
-        """Test handling of API exceptions"""
+        # This test verifies that API exceptions are handled gracefully
         mock_client = Mock()
         mock_rest_client.return_value = mock_client
         mock_client.list_aggs.side_effect = Exception("API Error")
@@ -84,18 +82,14 @@ class TestPolygonService:
             assert result is None
     
     def test_real_api_connectivity(self):
-        """Test actual connectivity to Polygon API"""
-        # Skip if no API key
+        # This test makes a real API call to verify actual connectivity to Polygon.io
         if not os.getenv('POLYGON_API_KEY'):
             pytest.skip("No real API key available")
         
         try:
             service = PolygonService()
-            
-            # Test with a real ticker
             result = service.get_intraday_data("AAPL")
             
-            # If we get here, the API call was successful (like a 200 response)
             assert result is not None
             assert result['ticker'] == "AAPL"
             assert 'open' in result
@@ -111,8 +105,7 @@ class TestPolygonService:
             pytest.fail(f"Real API connectivity test failed: {e}")
 
 def test_polygon_service_integration():
-    """Integration test - only run if you have a real API key"""
-    # Skip this test if no real API key is available
+    # This test performs a full integration test with the real Polygon API
     if not os.getenv('POLYGON_API_KEY'):
         pytest.skip("No real API key available for integration test")
     
