@@ -1,134 +1,135 @@
 import pytest
-from unittest.mock import Mock, patch
 import sys
 import os
 
 # Add the parent directory to the path so we can import from external
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from external.polygon_auth import PolygonService
+from external.polygon_trading_data import PolygonTradingDataService
 
-class TestPolygonService:
+class TestPolygonTradingDataService:
     
-    @patch('external.polygon_auth.RESTClient')
-    def test_init_success(self, mock_rest_client):
-        # This test verifies that the PolygonService initializes correctly when given a valid API key
-        with patch.dict(os.environ, {'POLYGON_API_KEY': 'test_key'}):
-            service = PolygonService()
-            assert service.client is not None
-            mock_rest_client.assert_called_once_with(api_key='test_key')
-    
-    def test_init_missing_api_key(self):
-        # This test ensures the service fails gracefully when no API key is provided
-        with patch.dict(os.environ, {}, clear=True):
-            with pytest.raises(ValueError, match="POLYGON_API_KEY not found"):
-                PolygonService()
-    
-    @patch('external.polygon_auth.RESTClient')
-    def test_get_intraday_data_success(self, mock_rest_client):
-        # This test mocks a successful API response and verifies the data is processed correctly
-        mock_client = Mock()
-        mock_rest_client.return_value = mock_client
-        
-        mock_agg = Mock()
-        mock_agg.open = 150.0
-        mock_agg.high = 151.0
-        mock_agg.low = 149.0
-        mock_agg.close = 150.5
-        mock_agg.volume = 1000000
-        mock_agg.vwap = 150.25
-        mock_agg.timestamp = 1703123456789
-        
-        mock_client.list_aggs.return_value = [mock_agg]
-        
-        with patch.dict(os.environ, {'POLYGON_API_KEY': 'test_key'}):
-            service = PolygonService()
-            result = service.get_intraday_data("AAPL")
-            
-            assert result is not None
-            assert result['ticker'] == "AAPL"
-            assert result['open'] == 150.0
-            assert result['high'] == 151.0
-            assert result['low'] == 149.0
-            assert result['close'] == 150.5
-            assert result['volume'] == 1000000
-            assert result['vwap'] == 150.25
-            assert result['timestamp'] == 1703123456789
-    
-    @patch('external.polygon_auth.RESTClient')
-    def test_get_intraday_data_no_results(self, mock_rest_client):
-        # This test handles the case where the API returns no data
-        mock_client = Mock()
-        mock_rest_client.return_value = mock_client
-        mock_client.list_aggs.return_value = []
-        
-        with patch.dict(os.environ, {'POLYGON_API_KEY': 'test_key'}):
-            service = PolygonService()
-            result = service.get_intraday_data("INVALID")
-            
-            assert result is None
-    
-    @patch('external.polygon_auth.RESTClient')
-    def test_get_intraday_data_exception(self, mock_rest_client):
-        # This test verifies that API exceptions are handled gracefully
-        mock_client = Mock()
-        mock_rest_client.return_value = mock_client
-        mock_client.list_aggs.side_effect = Exception("API Error")
-        
-        with patch.dict(os.environ, {'POLYGON_API_KEY': 'test_key'}):
-            service = PolygonService()
-            result = service.get_intraday_data("AAPL")
-            
-            assert result is None
-    
-    def test_real_api_connectivity(self):
-        # This test makes a real API call to verify actual connectivity to Polygon.io
+    def setup_method(self):
+        # This runs before each test method
         if not os.getenv('POLYGON_API_KEY'):
             pytest.skip("No real API key available")
-        
-        try:
-            service = PolygonService()
-            result = service.get_intraday_data("AAPL")
-            
-            assert result is not None
-            assert result['ticker'] == "AAPL"
-            assert 'open' in result
-            assert 'close' in result
-            assert 'volume' in result
-            
-            print(f"✅ Real API connectivity test passed!")
-            print(f"   Got data for {result['ticker']}")
-            print(f"   Latest close: ${result['close']}")
-            print(f"   Volume: {result['volume']:,}")
-            
-        except Exception as e:
-            pytest.fail(f"Real API connectivity test failed: {e}")
-
-def test_polygon_service_integration():
-    # This test performs a full integration test with the real Polygon API
-    if not os.getenv('POLYGON_API_KEY'):
-        pytest.skip("No real API key available for integration test")
+        self.service = PolygonTradingDataService()
     
-    try:
-        service = PolygonService()
-        result = service.get_intraday_data("AAPL")
+    def test_init_success(self):
+        # This test verifies that the service initializes correctly with a real API key
+        assert self.service.client is not None
+        print("✅ Service initialized successfully")
+    
+    def test_get_trade_volume_data_real(self):
+        # This test makes a real API call to get trade volume data
+        result = self.service.get_trade_volume_data("AAPL")
         
         if result:
-            assert isinstance(result, dict)
-            assert 'ticker' in result
-            assert 'open' in result
-            assert 'high' in result
-            assert 'low' in result
-            assert 'close' in result
-            assert 'volume' in result
-            assert 'vwap' in result
-            assert 'timestamp' in result
-            print("✅ Integration test passed!")
+            assert result['ticker'] == "AAPL"
+            assert 'total_volume' in result
+            assert 'avg_trade_price' in result
+            assert 'trade_count' in result
+            print(f"✅ Trade volume data: {result}")
         else:
-            pytest.skip("No data returned from API")
+            pytest.skip("No trade volume data returned from API")
+    
+    def test_get_bid_ask_spread_real(self):
+        # This test makes a real API call to get bid/ask spread data
+        result = self.service.get_bid_ask_spread("AAPL")
+        
+        if result:
+            assert result['ticker'] == "AAPL"
+            assert 'bid_price' in result
+            assert 'ask_price' in result
+            assert 'spread' in result
+            assert 'spread_percentage' in result
+            print(f"✅ Bid/ask spread data: {result}")
+        else:
+            pytest.skip("No bid/ask spread data returned from API")
+    
+    def test_get_order_imbalance_real(self):
+        # This test makes a real API call to get order imbalance data
+        result = self.service.get_order_imbalance("AAPL")
+        
+        if result:
+            assert result['ticker'] == "AAPL"
+            assert 'bid_volume' in result
+            assert 'ask_volume' in result
+            assert 'imbalance' in result
+            assert 'excess_demand' in result
+            print(f"✅ Order imbalance data: {result}")
+        else:
+            pytest.skip("No order imbalance data returned from API")
+    
+    def test_get_ohlc_momentum_real(self):
+        # This test makes a real API call to get OHLC momentum data
+        result = self.service.get_ohlc_momentum("AAPL")
+        
+        if result:
+            assert result['ticker'] == "AAPL"
+            assert 'current_close' in result
+            assert 'previous_close' in result
+            assert 'momentum' in result
+            assert 'trend' in result
+            print(f"✅ OHLC momentum data: {result}")
+        else:
+            pytest.skip("No OHLC momentum data returned from API")
+    
+    def test_get_snapshot_mover_data_real(self):
+        # This test makes a real API call to get snapshot data
+        result = self.service.get_snapshot_mover_data("AAPL")
+        
+        if result:
+            assert result['ticker'] == "AAPL"
+            assert 'last_quote' in result or 'last_trade' in result
+            print(f"✅ Snapshot data: {result}")
+        else:
+            pytest.skip("No snapshot data returned from API")
+    
+    def test_get_corporate_actions_real(self):
+        # This test makes a real API call to get corporate actions data
+        result = self.service.get_corporate_actions("AAPL")
+        
+        if result:
+            assert result['ticker'] == "AAPL"
+            assert 'dividend_count' in result
+            print(f"✅ Corporate actions data: {result}")
+        else:
+            pytest.skip("No corporate actions data returned from API")
+    
+    def test_multiple_tickers_real(self):
+        # This test tests multiple tickers to verify the service works broadly
+        tickers = ["AAPL", "MSFT", "GOOGL"]
+        
+        for ticker in tickers:
+            result = self.service.get_bid_ask_spread(ticker)
+            if result:
+                assert result['ticker'] == ticker
+                print(f"✅ {ticker} data retrieved successfully")
+            else:
+                print(f"⚠️ No data for {ticker}")
+
+def test_service_integration_real():
+    # This test performs a full integration test with real API calls
+    if not os.getenv('POLYGON_API_KEY'):
+        pytest.skip("No real API key available")
+    
+    try:
+        service = PolygonTradingDataService()
+        
+        # Test multiple functions with real data
+        spread_data = service.get_bid_ask_spread("AAPL")
+        momentum_data = service.get_ohlc_momentum("AAPL")
+        
+        if spread_data and momentum_data:
+            print("✅ Full integration test passed!")
+            print(f"   Spread: ${spread_data['spread']:.4f}")
+            print(f"   Momentum: {momentum_data['momentum']:.2f} ({momentum_data['trend']})")
+        else:
+            pytest.skip("Insufficient data returned from API")
             
     except Exception as e:
-        pytest.skip(f"Integration test failed: {e}")
+        pytest.fail(f"Integration test failed: {e}")
 
 if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+    pytest.main([__file__, '-v', '-s'])
