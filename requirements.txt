@@ -1,0 +1,18 @@
+# Core dependencies for Intraday Equity Screener
+requests==2.31.0
+python-dotenv==1.0.1
+polygon-api-client
+pytest==8.4.1
+
+# Data manipulation (for future ML features)
+pandas==1.4.2
+numpy==1.26.4
+scikit-learn==1.6.1
+
+# Web framework (for future API endpoints)
+fastapi==0.109.0
+uvicorn==0.26.0
+
+# Utilities
+python-dateutil==2.8.2
+pytz==2022.1
