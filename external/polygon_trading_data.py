@@ -1,5 +1,6 @@
 from polygon import RESTClient
 import os
+import pandas as pd
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -125,6 +126,46 @@ class PolygonTradingDataService:
             print(f"Error getting snapshot data: {e}")
             return None
     
+    def get_hourly_ohlcv(self, ticker: str, from_date: str, to_date: str) -> pd.DataFrame:
+        """Fetch hourly OHLCV bars from Polygon aggregates API.
+
+        Args:
+            ticker: Stock ticker symbol (e.g. "AAPL")
+            from_date: Start date string "YYYY-MM-DD" (inclusive)
+            to_date: End date string "YYYY-MM-DD" (inclusive)
+
+        Returns:
+            DataFrame with columns [timestamp, open, high, low, close, volume],
+            sorted ascending by timestamp. Returns empty DataFrame on no data.
+        """
+        _EMPTY = pd.DataFrame(columns=["timestamp", "open", "high", "low", "close", "volume"])
+        try:
+            rows = []
+            for agg in self.client.list_aggs(
+                ticker=ticker,
+                multiplier=1,
+                timespan="hour",
+                from_=from_date,
+                to=to_date,
+            ):
+                rows.append({
+                    "timestamp": pd.Timestamp(agg.timestamp, unit="ms", tz="UTC"),
+                    "open": agg.open,
+                    "high": agg.high,
+                    "low": agg.low,
+                    "close": agg.close,
+                    "volume": agg.volume,
+                })
+
+            if not rows:
+                return _EMPTY
+
+            df = pd.DataFrame(rows)
+            return df.sort_values("timestamp").reset_index(drop=True)
+        except Exception as e:
+            print(f"Error getting hourly OHLCV data: {e}")
+            return _EMPTY
+
     def get_corporate_actions(self, ticker="AAPL"):
         # Get corporate actions like dividends and splits
         try:
